@@ -19,6 +19,8 @@ void print_vterm (VTerm* vt) {
             vterm_screen_get_cell (vterm_obtain_screen (vt), (VTermPos){r, c}, &cell);
 
             if (cell.width) {
+                if (!cell.chars[0]) putchar ('-');
+
                 for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
                     uint32_t cp = cell.chars[i];
                     if (cp < 0x80) {
@@ -40,13 +42,61 @@ void print_vterm (VTerm* vt) {
                 }
                 c += cell.width;
             } else {
-                putchar ('-');
+                fprintf (stderr, "vterm screen format error\n");
                 ++c;
             }
         }
 
         putchar ('\n');
     }
+}
+
+int vterm_escape (RINGBUF dest, int escape) {
+    if (escape == 48) {  // <L>
+        ringbuf_write (dest, "<", 1);
+    } else if (escape == 52) {  // <P>
+        return 1;
+    } else if (escape == 60) {  // <X>
+        return 2;
+    } else if (escape == 2550) {  // <CR>
+        ringbuf_write (dest, "\r", 1);
+    } else if (escape == 171495) {  // <ESC>
+        ringbuf_write (dest, "\x1b", 1);
+    } else {
+        fprintf (stderr, "unknown escape %d\n", escape);
+        return -1;
+    }
+
+    return 0;
+}
+
+const int VTERM_ESCAPE_INIT_STAT = -1;
+int vterm_escape_translate (RINGBUF dest, int* status, char c) {
+    if (*status == -1) {
+        if (c == '<')
+            *status = 0;
+        else if (c != '\n' && c != '\r')
+            ringbuf_write (dest, &c, 1);
+
+    } else {
+        if (c == '>') {
+            int ret = vterm_escape (dest, *status);
+            *status = -1;
+            return ret;
+        }
+        if (*status & (63 << 24)) return -1;
+
+        if ('0' <= c && c <= '9') {
+            *status = *status * 64 + c - '0' + 1;
+        } else if ('a' <= c && c <= 'z') {
+            *status = *status * 64 + c - 'a' + 11;
+        } else if ('A' <= c && c <= 'Z') {
+            *status = *status * 64 + c - 'A' + 37;
+        } else {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 int cb_damage (VTermRect rect, void* u) {

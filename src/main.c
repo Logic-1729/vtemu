@@ -13,11 +13,12 @@
 #include "ringbuf.h"
 
 int main (void) {
-    VTerm* vt = vterm_new (120, 40);
+    VTerm* vt = vterm_new (30, 80);
     if (!vt) {
         fprintf (stderr, "fail to create vterm\n");
         exit (EXIT_FAILURE);
     }
+    vterm_set_utf8 (vt, 1);
     VTermScreen* vts = vterm_obtain_screen (vt);
     vterm_screen_set_callbacks (vts, &mvtscb, NULL);
     vterm_screen_reset (vts, 1);
@@ -63,9 +64,22 @@ int main (void) {
         exit (EXIT_FAILURE);
     }
 
+    int status = VTERM_ESCAPE_INIT_STAT;
     while (1) {
-        int stdin_fd = STDIN_FILENO;
-        if (ringbuf_copyd_from (in_buf, &stdin_fd, RINGBUF_READ_FD) < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        for (char c; read (STDIN_FILENO, &c, 1) != -1;) {
+            int com = vterm_escape_translate (in_buf, &status, c);
+            if (com == -1) {
+                fprintf (stderr, "unable to parse escape\n");
+                exit (EXIT_FAILURE);
+            } else if (com == 1) {
+                print_vterm (vt);
+            } else if (com == 2) {
+                sleep (1);
+                errno = EWOULDBLOCK;
+                break;
+            }
+        }
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
             perror ("unable to read stdin");
             exit (EXIT_FAILURE);
         }
