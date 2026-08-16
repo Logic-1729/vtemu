@@ -211,7 +211,7 @@ void print_vterm (VTerm* vt, int args) {
     if (args & MVTERM_PRINT_VISUAL) putcsi (0, 'm', args);
 }
 
-int vterm_escape (RINGBUF dest, int escape) {
+static int vterm_escape (RINGBUF dest, int escape) {
     if (escape == 48) {  // <L>
         ringbuf_write (dest, "<", 1);
     } else if (escape == 52) {  // <P>
@@ -258,50 +258,6 @@ int vterm_escape_translate (RINGBUF dest, int* status, char c) {
     }
     return 0;
 }
-
-int cb_damage (VTermRect rect, void* u) {
-    (void)rect;
-    (void)u;
-    return 1;
-}
-int cb_moverect (VTermRect d, VTermRect s, void* u) {
-    (void)d;
-    (void)s;
-    (void)u;
-    return 1;
-}
-int cb_movecursor (VTermPos p, VTermPos o, int v, void* u) {
-    (void)p;
-    (void)o;
-    (void)v;
-    (void)u;
-    return 1;
-}
-int cb_settermprop (VTermProp p, VTermValue* val, void* u) {
-    (void)p;
-    (void)val;
-    (void)u;
-    return 1;
-}
-int cb_bell (void* u) {
-    (void)u;
-    return 1;
-}
-int cb_pushline (int c, const VTermScreenCell* cl, void* u) {
-    (void)c;
-    (void)cl;
-    (void)u;
-    return 1;
-}
-int cb_popline (int c, VTermScreenCell* cl, void* u) {
-    (void)c;
-    (void)cl;
-    (void)u;
-    return 1;
-}
-
-const VTermScreenCallbacks mvtscb = {cb_damage,   cb_moverect, cb_movecursor, cb_settermprop, cb_bell, NULL,
-                                     cb_pushline, cb_popline,  NULL};
 
 static ssize_t ringbuf_read_vterm (void* ctx, void* buf, size_t n) {
     return (ssize_t)vterm_output_read ((VTerm*)ctx, (char*)buf, n);

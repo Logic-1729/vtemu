@@ -34,9 +34,10 @@ int main (int argc, char* const* argv) {
     uint64_t lines = 24, columns = 80;
     int visual_args = 0;
     uint64_t us = 10;
+    uint64_t xms = 100;
 
     opterr = 0;
-    for (int opt; (opt = getopt (argc, argv, ":c:l:s:v")) != -1;) {
+    for (int opt; (opt = getopt (argc, argv, ":c:l:s:vx:")) != -1;) {
         if (opt == ':') {
             fprintf (stderr, "-%c: requires an argument\n", optopt);
             return 0;
@@ -60,6 +61,11 @@ int main (int argc, char* const* argv) {
             }
         } else if (opt == 'v') {
             visual_args |= MVTERM_PRINT_VISUAL;
+        } else if (opt == 'x') {
+            if (!parse_uint (optarg, &us)) {
+                fprintf (stderr, "-x: needs an uinteger\n");
+                return 0;
+            }
         }
     }
 
@@ -70,7 +76,6 @@ int main (int argc, char* const* argv) {
     }
     vterm_set_utf8 (vt, 1);
     VTermScreen* vts = vterm_obtain_screen (vt);
-    vterm_screen_set_callbacks (vts, &mvtscb, NULL);
     vterm_screen_reset (vts, 1);
 
     PTYTTY pty = ptytty_create ();
@@ -134,7 +139,7 @@ int main (int argc, char* const* argv) {
                 } else if (comm == MVTERM_COMM_PRINT) {
                     print_vterm (vt, visual_args);
                 } else if (comm == MVTERM_COMM_PAUSE) {
-                    wait = now_ms () + 200;
+                    wait = now_ms () + xms;
                     errno = EWOULDBLOCK;
                     break;
                 }
