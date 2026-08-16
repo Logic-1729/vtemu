@@ -10,6 +10,9 @@ void print_vterm (VTerm* vt);
 extern const int VTERM_ESCAPE_INIT_STAT;
 int vterm_escape_translate (RINGBUF dest, int* status, char c);
 
+#define VTERM_COMM_PRINT 1
+#define VTERM_COMM_PAUSE 2
+
 extern const VTermScreenCallbacks mvtscb;
 
 extern RINGBUF_READ_CALLBACK RINGBUF_READ_VTERM;

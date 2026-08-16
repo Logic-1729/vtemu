@@ -6,11 +6,18 @@
 #include <stdio.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 #include <vterm.h>
 
 #include "mvterm.h"
 #include "ringbuf.h"
+
+uint64_t now_ms () {
+    struct timespec ts;
+    timespec_get (&ts, TIME_UTC);
+    return (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
 
 int main (void) {
     VTerm* vt = vterm_new (30, 80);
@@ -65,23 +72,26 @@ int main (void) {
     }
 
     int status = VTERM_ESCAPE_INIT_STAT;
+    uint64_t wait = now_ms ();
     while (1) {
-        for (char c; read (STDIN_FILENO, &c, 1) != -1;) {
-            int com = vterm_escape_translate (in_buf, &status, c);
-            if (com == -1) {
-                fprintf (stderr, "unable to parse escape\n");
-                exit (EXIT_FAILURE);
-            } else if (com == 1) {
-                print_vterm (vt);
-            } else if (com == 2) {
-                sleep (1);
-                errno = EWOULDBLOCK;
-                break;
+        if (wait < now_ms ()) {
+            for (char c; read (STDIN_FILENO, &c, 1) != -1;) {
+                int comm = vterm_escape_translate (in_buf, &status, c);
+                if (comm == -1) {
+                    fprintf (stderr, "unable to parse escape\n");
+                    exit (EXIT_FAILURE);
+                } else if (comm == VTERM_COMM_PRINT) {
+                    print_vterm (vt);
+                } else if (comm == VTERM_COMM_PAUSE) {
+                    wait = now_ms () + 200;
+                    errno = EWOULDBLOCK;
+                    break;
+                }
             }
-        }
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror ("unable to read stdin");
-            exit (EXIT_FAILURE);
+            if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                perror ("unable to read stdin");
+                exit (EXIT_FAILURE);
+            }
         }
 
         if (ringbuf_copyd_to (in_buf, &master, RINGBUF_WRITE_FD) < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {

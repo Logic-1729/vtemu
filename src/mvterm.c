@@ -3,6 +3,24 @@
 #include <stdio.h>
 #include <vterm.h>
 
+static void pututf8 (uint32_t cp) {
+    if (cp < 0x80) {
+        putchar ((int)cp);
+    } else if (cp < 0x800) {
+        putchar (0xC0 | (int)(cp >> 6));
+        putchar (0x80 | (int)(cp & 0x3F));
+    } else if (cp < 0x10000) {
+        putchar (0xE0 | (int)(cp >> 12));
+        putchar (0x80 | (int)((cp >> 6) & 0x3F));
+        putchar (0x80 | (int)(cp & 0x3F));
+    } else {
+        putchar (0xF0 | (int)(cp >> 18));
+        putchar (0x80 | (int)((cp >> 12) & 0x3F));
+        putchar (0x80 | (int)((cp >> 6) & 0x3F));
+        putchar (0x80 | (int)(cp & 0x3F));
+    }
+}
+
 void print_vterm (VTerm* vt) {
     int rows, cols;
     vterm_get_size (vt, &rows, &cols);
@@ -23,22 +41,8 @@ void print_vterm (VTerm* vt) {
 
                 for (int i = 0; i < VTERM_MAX_CHARS_PER_CELL && cell.chars[i]; i++) {
                     uint32_t cp = cell.chars[i];
-                    if (cp < 0x80) {
-                        if (cp == '%' || cp == '-') putchar ('%');
-                        putchar ((int)cp);
-                    } else if (cp < 0x800) {
-                        putchar (0xC0 | (int)(cp >> 6));
-                        putchar (0x80 | (int)(cp & 0x3F));
-                    } else if (cp < 0x10000) {
-                        putchar (0xE0 | (int)(cp >> 12));
-                        putchar (0x80 | (int)((cp >> 6) & 0x3F));
-                        putchar (0x80 | (int)(cp & 0x3F));
-                    } else {
-                        putchar (0xF0 | (int)(cp >> 18));
-                        putchar (0x80 | (int)((cp >> 12) & 0x3F));
-                        putchar (0x80 | (int)((cp >> 6) & 0x3F));
-                        putchar (0x80 | (int)(cp & 0x3F));
-                    }
+                    if (cp == '%' || cp == '-') putchar ('%');
+                    pututf8 (cp);
                 }
                 c += cell.width;
             } else {
@@ -55,9 +59,9 @@ int vterm_escape (RINGBUF dest, int escape) {
     if (escape == 48) {  // <L>
         ringbuf_write (dest, "<", 1);
     } else if (escape == 52) {  // <P>
-        return 1;
+        return VTERM_COMM_PRINT;
     } else if (escape == 60) {  // <X>
-        return 2;
+        return VTERM_COMM_PAUSE;
     } else if (escape == 2550) {  // <CR>
         ringbuf_write (dest, "\r", 1);
     } else if (escape == 171495) {  // <ESC>
