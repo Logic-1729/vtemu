@@ -213,15 +213,15 @@ void print_vterm (VTerm* vt, int args) {
 
 static int vterm_escape (RINGBUF dest, int escape) {
     if (escape == 48) {  // <L>
-        ringbuf_write (dest, "<", 1);
+        ringbuf_writed (dest, "<", 1);
     } else if (escape == 52) {  // <P>
         return MVTERM_COMM_PRINT;
     } else if (escape == 60) {  // <X>
         return MVTERM_COMM_PAUSE;
     } else if (escape == 2550) {  // <CR>
-        ringbuf_write (dest, "\r", 1);
+        ringbuf_writed (dest, "\r", 1);
     } else if (escape == 171495) {  // <ESC>
-        ringbuf_write (dest, "\x1b", 1);
+        ringbuf_writed (dest, "\x1b", 1);
     } else {
         fprintf (stderr, "unknown escape %d\n", escape);
         return -1;
@@ -236,7 +236,7 @@ int vterm_escape_translate (RINGBUF dest, int* status, char c) {
         if (c == '<')
             *status = 0;
         else if (c != '\n' && c != '\r')
-            ringbuf_write (dest, &c, 1);
+            ringbuf_writed (dest, &c, 1);
 
     } else {
         if (c == '>') {

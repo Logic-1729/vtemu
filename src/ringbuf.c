@@ -23,6 +23,10 @@ ssize_t ringbuf_read (RINGBUF rb, void* buf, size_t n) {
     struct ringbuf_slice sl = {buf, buf + n};
     return ringbuf_copy_to (rb, &sl, ringbuf_write_slice);
 }
+ssize_t ringbuf_readd (RINGBUF rb, void* buf, size_t n) {
+    struct ringbuf_slice sl = {buf, buf + n};
+    return ringbuf_copyd_to (rb, &sl, ringbuf_write_slice);
+}
 
 struct ringbuf_cslice {
     const void* buf;
@@ -42,11 +46,22 @@ ssize_t ringbuf_write (RINGBUF rb, const void* buf, size_t n) {
     struct ringbuf_cslice sl = {buf, buf + n};
     return ringbuf_copy_from (rb, &sl, ringbuf_read_slice);
 }
+ssize_t ringbuf_writed (RINGBUF rb, const void* buf, size_t n) {
+    struct ringbuf_cslice sl = {buf, buf + n};
+    return ringbuf_copyd_from (rb, &sl, ringbuf_read_slice);
+}
 
 static ssize_t ringbuf_ctx_read (void* ctx, void* buf, size_t n) { return ringbuf_read ((RINGBUF)ctx, buf, n); }
 static ssize_t ringbuf_ctx_write (void* ctx, const void* buf, size_t n) { return ringbuf_write ((RINGBUF)ctx, buf, n); }
+static ssize_t ringbuf_ctx_readd (void* ctx, void* buf, size_t n) { return ringbuf_read ((RINGBUF)ctx, buf, n); }
+static ssize_t ringbuf_ctx_writed (void* ctx, const void* buf, size_t n) {
+    return ringbuf_write ((RINGBUF)ctx, buf, n);
+}
+
 RINGBUF_READ_CALLBACK RINGBUF_READ = ringbuf_ctx_read;
 RINGBUF_WRITE_CALLBACK RINGBUF_WRITE = ringbuf_ctx_write;
+RINGBUF_READ_CALLBACK RINGBUF_READD = ringbuf_ctx_readd;
+RINGBUF_WRITE_CALLBACK RINGBUF_WRITED = ringbuf_ctx_writed;
 
 static ssize_t ringbuf_read_fd (void* ctx, void* buf, size_t n) { return read (*(const int*)ctx, buf, n); }
 static ssize_t ringbuf_write_fd (void* ctx, const void* buf, size_t n) { return write (*(const int*)ctx, buf, n); }
