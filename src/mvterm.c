@@ -21,7 +21,7 @@ static void pututf8 (uint32_t cp) {
     }
 }
 static void puthexdig (int hex) {
-    if ((hex & 0xa) || (hex & 0xc))
+    if (hex >= 10)
         putchar (hex - 10 + 'a');
     else
         putchar (hex + '0');
