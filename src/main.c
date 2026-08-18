@@ -29,6 +29,120 @@ int parse_int (const char* str, int64_t* val) {
     *val = strtol (str, &endptr, 0);
     return !*endptr;
 }
+static void print_usage (FILE* out, const char* prog) {
+    fprintf (out,
+             "Usage: %s [options] [--] [command [args...]]\n"
+             "\n"
+             "Run COMMAND on a pseudoterminal and mirror its output into an\n"
+             "internal libvterm screen model.  Bytes read from standard input\n"
+             "are sent to the child process, except for vtemu input escapes.\n"
+             "\n"
+             "If COMMAND is omitted, vtemu runs: sh -i\n"
+             "\n"
+             "The child starts with a controlling terminal, TERM=xterm-256color,\n"
+             "and the terminal size selected by -l and -c.\n"
+             "\n"
+             "About sh -i:\n"
+             "  The -i flag asks sh to run as an interactive shell.  In that mode\n"
+             "  the shell behaves like one opened from a real terminal: it prints\n"
+             "  prompts, enables job-control commands such as fg and bg when the\n"
+             "  shell supports them, and uses terminal-oriented behavior for input.\n"
+             "  This is the default because vtemu is usually used to observe and\n"
+             "  test full-screen or interactive terminal behavior.\n"
+             "\n"
+             "  Plain sh, without -i, may treat its input as a non-interactive\n"
+             "  script.  It usually prints no prompt, may skip interactive startup\n"
+             "  behavior, and may handle input differently.  Use plain sh only when\n"
+             "  you intentionally want script-style execution instead of a live\n"
+             "  shell session.\n"
+             "\n"
+             "Options:\n"
+             "  -c NUM    set virtual terminal columns to NUM (default: 80)\n"
+             "  -l NUM    set virtual terminal lines to NUM (default: 24)\n"
+             "  -s NUM    set idle polling interval in microseconds (default: 10);\n"
+             "              use 0 to yield the scheduler instead of sleeping\n"
+             "  -x NUM    set <X> pause duration in milliseconds (default: 100)\n"
+             "  -v        turn on visual mode; printed screen snapshots are readable\n"
+             "              in a console by emitting real ANSI escape sequences\n"
+             "              for visual attributes and colors\n"
+             "  -h        display this help and exit\n"
+             "\n"
+             "Mandatory arguments to options are mandatory.  NUM is parsed as an\n"
+             "unsigned integer; decimal, octal, and hexadecimal forms accepted by\n"
+             "strtoul(3) are allowed.\n"
+             "\n"
+             "Use -- before COMMAND when the command itself starts with an option.\n"
+             "For a simple visual terminal-program snapshot:\n"
+             "  echo \"<X><P>:q<CR>\" | bin/vtemu -v vim 2>/dev/null\n"
+             "\n"
+             "Input:\n"
+             "  Standard input is processed byte by byte.  Literal newline and\n"
+             "  carriage return bytes are ignored; use <CR> to send Enter to\n"
+             "  the child process.\n"
+             "\n"
+             "Input escapes:\n"
+             "\n"
+             "  <P>       print the current virtual terminal screen to stdout\n"
+             "  <X>       pause input processing for the -x duration while output\n"
+             "              continues to be read and emulated\n"
+             "  <ESC>     send an Escape byte to the child process\n"
+             "  <CR>      send a carriage return byte to the child process\n"
+             "  <L>       send a literal '<' byte to the child process\n"
+             "\n"
+             "Timing with <X>:\n"
+             "  Use <X> when the child needs time to react before the next input\n"
+             "  arrives.  Common cases are waiting for sh -i to print its prompt,\n"
+             "  waiting for Vim or another full-screen program to initialize and\n"
+             "  refresh its screen, waiting after <ESC> for Vim to leave insert\n"
+             "  mode, or waiting before <P> so the snapshot captures the updated\n"
+             "  virtual terminal.  Repeat <X> to wait longer.\n"
+             "\n"
+             "Screen printing:\n"
+             "  vtemu writes a screen snapshot only when <P> is received.  Without\n"
+             "  -v, the snapshot uses vtemu's stable escaped test format, such as\n"
+             "  %%f... colors and %%10 cells.  This is not console-readable, but it\n"
+             "  makes spaces, null cells, widths, and attributes easier to test.\n"
+             "  With -v, visual mode makes the output readable in a console, but\n"
+             "  some characters, such as spaces and null cells, are harder to\n"
+             "  distinguish.\n"
+             "\n"
+             "Examples:\n"
+             "  %s -h\n"
+             "      Show this help text.\n"
+             "\n"
+             "  %s -l 8 -c 40 -- sh -i\n"
+             "      Run an interactive shell in an 8-line by 40-column terminal.\n"
+             "\n"
+             "  printf '<X>echo hello<CR><X><P>exit<CR>' | %s -l 8 -c 40 -- sh -i\n"
+             "      Wait for the shell prompt, run a command, print the screen,\n"
+             "      then exit the shell.\n"
+             "\n"
+             "  echo \"<X><P>:q<CR>\" | %s -v vim 2>/dev/null\n"
+             "      Print a visual Vim screen snapshot, then quit Vim.\n"
+             "\n"
+             "  printf '<ESC>:q<CR><P>' | %s -v -l 24 -c 80 -- vim\n"
+             "      Send Escape and :q to Vim, then print a visual screen snapshot.\n"
+             "\n"
+             "  printf '%%s' '<X><X>vim tmp.txt<CR><X><X><X>ggdGiHello,World!<X><P><ESC><X><X><X>:wq<CR><X><X><X>exit<CR>' | %s -v\n"
+             "      Drive Vim from the default shell, insert text, and print while\n"
+             "      Vim is still in insert mode.  Because <P> appears before <ESC>,\n"
+             "      the snapshot shows -- INSERT --.\n"
+             "\n"
+             "  printf '%%s' '<X><X>vim tmp.txt<CR><X><X><X>ggdGiHello,World!<ESC><X><X><X>:wq<CR><X><X><X>cat tmp.txt<CR><X><P>exit<CR>' | %s -v\n"
+             "      Edit and save tmp.txt with Vim, return to the shell, cat the\n"
+             "      saved file, print the shell screen, then exit.\n"
+             "\n"
+             "Exit status:\n"
+             "  0  if help was displayed or vtemu exits normally\n"
+             "  1  if an option is invalid, an argument is missing or malformed,\n"
+             "     or a terminal/pty operation fails\n"
+             "\n"
+             "Notes:\n"
+             "  vtemu currently supports short options only; use -h, not --help.\n"
+             "  When vtemu exits, it closes the pseudoterminal and terminates any\n"
+             "  remaining child process.\n",
+             prog, prog, prog, prog, prog, prog, prog, prog);
+}
 
 int main (int argc, char* const* argv) {
     uint64_t lines = 24, columns = 80;
@@ -37,35 +151,44 @@ int main (int argc, char* const* argv) {
     uint64_t xms = 100;
 
     opterr = 0;
-    for (int opt; (opt = getopt (argc, argv, ":c:l:s:vx:")) != -1;) {
+    for (int opt; (opt = getopt (argc, argv, ":c:l:s:x:vh")) != -1;) {
         if (opt == ':') {
             fprintf (stderr, "-%c: requires an argument\n", optopt);
-            return 0;
+            fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+            return EXIT_FAILURE;
         } else if (opt == '?') {
             fprintf (stderr, "-%c: unknown option\n", optopt);
-            return 0;
+            fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+            return EXIT_FAILURE;
         } else if (opt == 'c') {
             if (!parse_uint (optarg, &columns)) {
                 fprintf (stderr, "-c: needs an uinteger\n");
-                return 0;
+                fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+                return EXIT_FAILURE;
             }
         } else if (opt == 'l') {
             if (!parse_uint (optarg, &lines)) {
                 fprintf (stderr, "-l: needs an uinteger\n");
-                return 0;
+                fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+                return EXIT_FAILURE;
             }
         } else if (opt == 's') {
             if (!parse_uint (optarg, &us)) {
                 fprintf (stderr, "-s: needs an uinteger\n");
-                return 0;
+                fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+                return EXIT_FAILURE;
             }
         } else if (opt == 'v') {
             visual_args |= MVTERM_PRINT_VISUAL;
         } else if (opt == 'x') {
-            if (!parse_uint (optarg, &us)) {
+            if (!parse_uint (optarg, &xms)) {
                 fprintf (stderr, "-x: needs an uinteger\n");
-                return 0;
+                fprintf (stderr, "Try '%s -h' for more information.\n", argv[0]);
+                return EXIT_FAILURE;
             }
+        } else if (opt == 'h') {
+            print_usage (stdout, argv[0]);
+            return EXIT_SUCCESS;
         }
     }
 
@@ -76,6 +199,7 @@ int main (int argc, char* const* argv) {
     }
     vterm_set_utf8 (vt, 1);
     VTermScreen* vts = vterm_obtain_screen (vt);
+    vterm_screen_set_callbacks (vts, &mvtscb, NULL);
     vterm_screen_reset (vts, 1);
 
     PTYTTY pty = ptytty_create ();
@@ -98,10 +222,15 @@ int main (int argc, char* const* argv) {
     pid_t pid = fork ();
     if (pid == 0) {
         setsid ();
+        if (ioctl (slave, TIOCSCTTY, 0) == -1) {
+            perror ("fail to set controlling tty");
+            _exit (EXIT_FAILURE);
+        }
+        close (master);
         dup2 (slave, STDIN_FILENO);
         dup2 (slave, STDOUT_FILENO);
         dup2 (slave, STDERR_FILENO);
-        close (slave);
+        if (slave > STDERR_FILENO) close (slave);
         setenv ("TERM", "xterm-256color", 1);
         argv[optind] ? execvp (argv[optind], argv + optind) : execlp ("sh", "sh", "-i", NULL);
         _exit (EXIT_FAILURE);
@@ -156,7 +285,7 @@ int main (int argc, char* const* argv) {
         }
 
         if (ringbuf_copyd_from (out_buf, &master, RINGBUF_READ_FD) < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror ("unable to read pty");
+            if (errno != EIO) perror ("unable to read pty");
             break;
         }
 
