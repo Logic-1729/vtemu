@@ -34,25 +34,22 @@ LDFLAGS  := -Wl,-z,relro,-z,now -pie
 LDLIBS   := -lptytty -lvterm
 
 TARGET := $(BIN_DIR)/$(TARGET_NAME)
-HDRS   := $(wildcard $(SRC_DIR)/*.h)
-SRCS   := $(wildcard $(SRC_DIR)/*.c)
+HDRS   := $(shell find $(SRC_DIR)/ -type f -name "*.h")
+INCS   := $(sort $(dir $(shell find src/ -type f -name "*.h")))
+SRCS   := $(shell find $(SRC_DIR)/ -type f -name "*.c")
 OBJS   := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
 .PHONY: all clean run debug
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS) | $(BIN_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+$(TARGET): $(OBJS)
+	@mkdir -p $(dir $@)
+	$(CXX) $(LDFLAGS) $(addprefix -I, $(INCS)) -o $@ $^ $(LDLIBS)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
-
-$(OBJ_DIR):
-	$(MKDIR) $@
-
-$(BIN_DIR):
-	$(MKDIR) $@
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $(addprefix -I, $(INCS)) -o $@ $<
 
 DEPS := $(OBJS:.o=.d)
 -include $(DEPS)
