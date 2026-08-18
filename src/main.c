@@ -199,7 +199,6 @@ int main (int argc, char* const* argv) {
     }
     vterm_set_utf8 (vt, 1);
     VTermScreen* vts = vterm_obtain_screen (vt);
-    vterm_screen_set_callbacks (vts, &mvtscb, NULL);
     vterm_screen_reset (vts, 1);
 
     PTYTTY pty = ptytty_create ();
