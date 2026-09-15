@@ -232,7 +232,7 @@ static void print_vterm (VTerm* vt, int top, int bottom, int left, int right, in
     }
 }
 
-static int vterm_escape (RINGBUF dest, const char* escape, VTerm* vt) {
+static int vterm_escape (const char* escape, VTerm* vt) {
     int n;
     char c;
     int x, y, a, b;
@@ -261,7 +261,7 @@ static int vterm_escape (RINGBUF dest, const char* escape, VTerm* vt) {
 
         print_vterm (vt, x, a, y, b, args);
     } else if (match ("L%n")) {
-        ringbuf_writed (dest, "<", 1);
+        vterm_keyboard_unichar (vt, '<', VTERM_MOD_NONE);
     } else if (match ("P%n")) {
         int rows, cols;
         vterm_get_size (vt, &rows, &cols);
@@ -373,17 +373,17 @@ key:
     return 0;
 }
 
-int mvterm_escape_translate (RINGBUF dest, VTERM_STATE* state, char c, VTerm* vt) {
+int mvterm_escape_translate (VTERM_STATE* state, char c, VTerm* vt) {
     if (state->buflen == 0) {
         if (c == '<')
             state->buflen = 1;
         else if (c != '\0' && c != '\n' && c != '\r' && c != '\t' && c != ' ')
-            ringbuf_writed (dest, &c, 1);
+            vterm_keyboard_unichar (vt, c, VTERM_MOD_NONE);
 
     } else {
         if (c == '>') {
             state->buf[state->buflen - 1] = '\0';
-            int ret = vterm_escape (dest, state->buf, vt);
+            int ret = vterm_escape (state->buf, vt);
             state->buflen = 0;
             return ret;
         } else if (c == '\n') {

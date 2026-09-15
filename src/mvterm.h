@@ -11,7 +11,7 @@ typedef struct {
     char buf[MVTERM_ESCAPE_MAXLEN];
     size_t buflen;
 } VTERM_STATE;
-int mvterm_escape_translate (RINGBUF dest, VTERM_STATE* state, char c, VTerm* vt);
+int mvterm_escape_translate (VTERM_STATE* state, char c, VTerm* vt);
 
 #define MVTERM_COMM_RESIZE 1
 #define MVTERM_COMM_PAUSE 2

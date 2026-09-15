@@ -138,7 +138,7 @@ int main (int argc, char* const* argv) {
         if (wait < now_ms ()) {
             int n;
             for (char c; (n = read (STDIN_FILENO, &c, 1)) > 0;) {
-                int comm = mvterm_escape_translate (in_buf, &state, c, vt);
+                int comm = mvterm_escape_translate (&state, c, vt);
                 if (comm == -1) {
                     fprintf (stderr, "unable to parse escape\n");
                     n = -2;
