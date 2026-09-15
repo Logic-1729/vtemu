@@ -30,6 +30,25 @@ int parse_int (const char* str, int64_t* val) {
     return !*endptr;
 }
 
+int set_selection (VTermSelectionMask mask, VTermStringFragment frag, void* user) {
+    if (!(mask & VTERM_SELECTION_CLIPBOARD)) return 0;
+
+    MVTERM_STATE* state = user;
+    if (frag.initial) {
+        if ((state->state & MVTERM_STATE_ISVTCOPYING) ||
+            ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING)))
+            return 0;
+        mvterm_state_start_copy (state);
+        state->state |= MVTERM_STATE_ISVTCOPYING;
+    }
+
+    if (!(state->state & MVTERM_STATE_ISVTCOPYING)) return 0;
+    mvterm_state_copy (state, frag.str, frag.len);
+    if (frag.final) state->state &= ~MVTERM_STATE_ISVTCOPYING;
+
+    return 1;
+}
+
 int main (int argc, char* const* argv) {
     uint64_t lines = 24, columns = 80;
     uint64_t us = 10;
@@ -132,7 +151,11 @@ int main (int argc, char* const* argv) {
         exit (EXIT_FAILURE);
     }
 
-    VTERM_STATE state = {};
+    MVTERM_STATE state = {};
+    VTermSelectionCallbacks scb = {set_selection, NULL};
+    char sbuf[4096];
+    vterm_state_set_selection_callbacks (vterm_obtain_state (vt), &scb, &state, sbuf, sizeof (sbuf));
+
     uint64_t wait = now_ms ();
     while (1) {
         if (wait < now_ms ()) {

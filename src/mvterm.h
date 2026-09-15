@@ -10,8 +10,20 @@
 typedef struct {
     char buf[MVTERM_ESCAPE_MAXLEN];
     size_t buflen;
-} VTERM_STATE;
-int mvterm_escape_translate (VTERM_STATE* state, char c, VTerm* vt);
+    int state;
+    char* clipboard;
+    size_t cliplen, clipsz;
+} MVTERM_STATE;
+
+void mvterm_state_start_copy (MVTERM_STATE* state);
+void mvterm_state_copy (MVTERM_STATE* state, const char* buf, size_t len);
+
+#define MVTERM_STATE_ISCOPYING 1
+#define MVTERM_STATE_ISPASTING 2
+#define MVTERM_STATE_ISVTCOPYING 4
+#define MVTERM_STATE_ISVTUSING 8
+
+int mvterm_escape_translate (MVTERM_STATE* state, char c, VTerm* vt);
 
 #define MVTERM_COMM_RESIZE 1
 #define MVTERM_COMM_PAUSE 2

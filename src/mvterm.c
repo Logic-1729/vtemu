@@ -1,8 +1,10 @@
 #include "mvterm.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <vterm.h>
 
 #include "vterm_keycodes.h"
@@ -232,7 +234,20 @@ static void print_vterm (VTerm* vt, int top, int bottom, int left, int right, in
     }
 }
 
-static int vterm_escape (const char* escape, VTerm* vt) {
+void mvterm_state_start_copy (MVTERM_STATE* state) {
+    free (state->clipboard);
+    state->clipboard = NULL, state->cliplen = state->clipsz = 0;
+}
+void mvterm_state_copy (MVTERM_STATE* state, const char* buf, size_t len) {
+    if (state->cliplen + len > state->clipsz) {
+        state->clipsz = state->cliplen + len + 8192;
+        state->clipboard = realloc (state->clipboard, state->clipsz);
+    }
+    memcpy (state->clipboard + state->cliplen, buf, len);
+    state->cliplen += len;
+}
+
+static int mvterm_escape (const char* escape, VTerm* vt, MVTERM_STATE* state) {
     int n;
     char c;
     int x, y, a, b;
@@ -261,7 +276,10 @@ static int vterm_escape (const char* escape, VTerm* vt) {
 
         print_vterm (vt, x, a, y, b, args);
     } else if (match ("L%n")) {
-        vterm_keyboard_unichar (vt, '<', VTERM_MOD_NONE);
+        if ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING))
+            mvterm_state_copy (state, "<", 1);
+        else if (!(state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISVTCOPYING)))
+            vterm_keyboard_unichar (vt, '<', VTERM_MOD_NONE);
     } else if (match ("P%n")) {
         int rows, cols;
         vterm_get_size (vt, &rows, &cols);
@@ -300,6 +318,41 @@ static int vterm_escape (const char* escape, VTerm* vt) {
     } else if (match ("RSZ%d;%d%n", &x, &y)) {
         vterm_set_size (vt, x, y);
         return MVTERM_COMM_RESIZE;
+    } else if (match ("PASTE%n")) {
+        if (state->state & MVTERM_STATE_ISPASTING)
+            vterm_keyboard_end_paste (vt);
+        else
+            vterm_keyboard_start_paste (vt);
+        state->state ^= MVTERM_STATE_ISPASTING;
+    } else if (match ("COPY%n")) {
+        if (!(state->state & MVTERM_STATE_ISCOPYING) &&
+            ~(state->state | ~(MVTERM_STATE_ISVTCOPYING | MVTERM_STATE_ISVTUSING))) {
+            mvterm_state_start_copy (state);
+            state->state &= ~MVTERM_STATE_ISVTUSING;
+        }
+
+        state->state ^= MVTERM_STATE_ISCOPYING;
+    } else if (match ("CLIP%n")) {
+        if (state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISPASTING)) {
+            putchar ('\\'), putchar ('x'), putchar ('\n');
+        } else {
+            for (size_t i = 0; i < state->cliplen; ++i) {
+                unsigned char c = state->clipboard[i];
+                if (c >= 0x20 && c < 0x7e)
+                    putchar (c);
+                else if (c == '\0')
+                    putchar ('\\'), putchar ('0');
+                else if (c == '\n')
+                    putchar ('\\'), putchar ('n');
+                else if (c == '\t')
+                    putchar ('\\'), putchar ('t');
+                else if (c == '\\')
+                    putchar ('\\'), putchar ('\\');
+                else
+                    putchar ('\\'), putchar ('0' + (c >> 6)), putchar ('0' + ((c >> 3) & 7)), putchar ('0' + (c & 7));
+            }
+            putchar ('\n');
+        }
     } else if (match ("%*c%n")) {
         return -1;
     } else {
@@ -365,25 +418,33 @@ key:
         return -1;
     }
 
-    if (key != VTERM_KEY_NONE)
+    if (key != VTERM_KEY_NONE) {
         vterm_keyboard_key (vt, key, mod);
-    else
-        vterm_keyboard_unichar (vt, c, mod);
+    } else {
+        if ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING))
+            mvterm_state_copy (state, &c, 1);
+        else if (!(state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISVTCOPYING)))
+            vterm_keyboard_unichar (vt, c, mod);
+    }
 
     return 0;
 }
 
-int mvterm_escape_translate (VTERM_STATE* state, char c, VTerm* vt) {
+int mvterm_escape_translate (MVTERM_STATE* state, char c, VTerm* vt) {
     if (state->buflen == 0) {
-        if (c == '<')
+        if (c == '<') {
             state->buflen = 1;
-        else if (c != '\0' && c != '\n' && c != '\r' && c != '\t' && c != ' ')
-            vterm_keyboard_unichar (vt, c, VTERM_MOD_NONE);
+        } else if (c != '\0' && c != '\n' && c != '\r' && c != '\t' && c != ' ') {
+            if ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING))
+                mvterm_state_copy (state, &c, 1);
+            else if (!(state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISVTCOPYING)))
+                vterm_keyboard_unichar (vt, c, VTERM_MOD_NONE);
+        }
 
     } else {
         if (c == '>') {
             state->buf[state->buflen - 1] = '\0';
-            int ret = vterm_escape (state->buf, vt);
+            int ret = mvterm_escape (state->buf, vt, state);
             state->buflen = 0;
             return ret;
         } else if (c == '\n') {
