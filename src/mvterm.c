@@ -334,23 +334,24 @@ static int mvterm_escape (const char* escape, VTerm* vt, MVTERM_STATE* state) {
         state->state ^= MVTERM_STATE_ISCOPYING;
     } else if (match ("CLIP%n")) {
         if (state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISPASTING)) {
-            putchar ('\\'), putchar ('x'), putchar ('\n');
+            putchars ("\\x\n");
         } else {
             for (size_t i = 0; i < state->cliplen; ++i) {
                 unsigned char c = state->clipboard[i];
                 if (c >= 0x20 && c < 0x7e)
                     putchar (c);
                 else if (c == '\0')
-                    putchar ('\\'), putchar ('0');
+                    putchars ("\\0");
                 else if (c == '\n')
-                    putchar ('\\'), putchar ('n');
+                    putchars ("\\n");
                 else if (c == '\t')
-                    putchar ('\\'), putchar ('t');
+                    putchars ("\\t");
                 else if (c == '\\')
-                    putchar ('\\'), putchar ('\\');
+                    putchars ("\\\\");
                 else
-                    putchar ('\\'), putchar ('0' + (c >> 6)), putchar ('0' + ((c >> 3) & 7)), putchar ('0' + (c & 7));
+                    putchars ("\\%c%c%c", '0' + (c >> 6), '0' + ((c >> 3) & 7), '0' + (c & 7));
             }
+            if (state->cliplen == 0) putchars ("\\-");
             putchar ('\n');
         }
     } else if (match ("%*c%n")) {
