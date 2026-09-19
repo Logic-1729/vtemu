@@ -175,7 +175,7 @@ int main (int argc, char* const* argv) {
                         exit (EXIT_FAILURE);
                     }
                 } else if (comm == MVTERM_COMM_PAUSE) {
-                    wait = now_ms () + xms;
+                    wait = now_ms () + (state.xms < 0 ? xms : (size_t)state.xms);
                     errno = EWOULDBLOCK;
                     break;
                 } else if (comm == MVTERM_COMM_END) {

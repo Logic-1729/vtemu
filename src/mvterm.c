@@ -289,6 +289,14 @@ static int mvterm_escape (const char* escape, VTerm* vt, MVTERM_STATE* state) {
         vterm_get_size (vt, &rows, &cols);
         print_vterm (vt, 0, rows, 0, cols, MVTERM_PRINT_VISUALM);
     } else if (match ("X%n")) {
+        state->xms = -1;
+        return MVTERM_COMM_PAUSE;
+    } else if (match ("X%d%n", &x)) {
+        state->xms = x;
+        return MVTERM_COMM_PAUSE;
+    } else if (match ("EX%n")) {
+        state->xms = -1;
+        vterm_keyboard_key (vt, VTERM_KEY_ESCAPE, VTERM_MOD_NONE);
         return MVTERM_COMM_PAUSE;
     } else if (match ("E%n")) {
         return MVTERM_COMM_END;

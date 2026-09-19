@@ -10,6 +10,7 @@
 typedef struct {
     char buf[MVTERM_ESCAPE_MAXLEN];
     size_t buflen;
+    int xms;
     int state;
     char* clipboard;
     size_t cliplen, clipsz;
