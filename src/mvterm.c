@@ -444,10 +444,12 @@ int mvterm_escape_translate (MVTERM_STATE* state, char c, VTerm* vt) {
         if (c == '<') {
             state->buflen = 1;
         } else if (c != '\0' && c != '\n' && c != '\r' && c != '\t' && c != ' ') {
-            if ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING))
+            if ((state->state & MVTERM_STATE_ISCOPYING) && !(state->state & MVTERM_STATE_ISVTUSING)) {
                 mvterm_state_copy (state, &c, 1);
-            else if (!(state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISVTCOPYING)))
-                vterm_keyboard_unichar (vt, c, VTERM_MOD_NONE);
+            } else if (!(state->state & (MVTERM_STATE_ISCOPYING | MVTERM_STATE_ISVTCOPYING))) {
+                wchar_t wc;
+                if (mbrtowc (&wc, &c, 1, &state->mbs) > 0) vterm_keyboard_unichar (vt, wc, VTERM_MOD_NONE);
+            }
         }
 
     } else {

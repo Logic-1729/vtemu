@@ -2,12 +2,14 @@
 #define __MVTERM_H__
 
 #include <vterm.h>
+#include <wchar.h>
 
 #include "ringbuf.h"
 
 #define MVTERM_ESCAPE_MAXLEN 128
 
 typedef struct {
+    mbstate_t mbs;
     char buf[MVTERM_ESCAPE_MAXLEN];
     size_t buflen;
     int xms;
