@@ -1,0 +1,13 @@
+Usage: vtemu [options] [--] [command [args...]]
+
+Run a command in a virtual terminal (default: sh -i).
+
+Options:
+  -h          Show this help and exit.
+  -c columns  Set terminal columns (default: 80).
+  -l lines    Set terminal lines (default: 24).
+  -s us       Set idle sleep in microseconds; 0 yields (default: 10).
+  -t term     Set TERM (default: xterm-256color).
+  -x ms       Set default pause in milliseconds (default: 100).
+
+Use -- before a command to pass its options unchanged.

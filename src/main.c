@@ -14,6 +14,10 @@
 #include "mvterm.h"
 #include "ringbuf.h"
 
+static const char help[] = {
+#embed "help.txt" suffix(, 0)
+};
+
 uint64_t now_ms () {
     struct timespec ts;
     timespec_get (&ts, TIME_UTC);
@@ -56,8 +60,11 @@ int main (int argc, char* const* argv) {
     const char* term = "xterm-256color";
 
     opterr = 0;
-    for (int opt; (opt = getopt (argc, argv, ":c:l:s:t:x:")) != -1;) {
-        if (opt == ':') {
+    for (int opt; (opt = getopt (argc, argv, ":hc:l:s:t:x:")) != -1;) {
+        if (opt == 'h') {
+            fputs (help, stdout);
+            return 0;
+        } else if (opt == ':') {
             fprintf (stderr, "-%c: requires an argument\n", optopt);
             return 0;
         } else if (opt == '?') {
